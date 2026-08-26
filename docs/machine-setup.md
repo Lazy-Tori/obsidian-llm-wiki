@@ -30,6 +30,11 @@ ln -sfn "$VAULT_PATH"/.claude/skills/wiki-* ~/.claude/skills/
 
 볼트 안에서만 쓸 거면 이 단계는 필요 없다.
 
+⚠️ **스킬은 스크립트와 달리 자기 위치로 볼트를 못 찾는다** — 볼트 밖에서 불리는 게 목적이라
+경로를 알아야 하고, `VAULT="${VAULT_PATH:-$HOME/second-brain}"` 로 잡는다. 볼트를
+`~/second-brain` 이 아닌 곳에 뒀으면 `VAULT_PATH` 를 셸 프로필에 넣거나(1번) 각
+`SKILL.md` 의 그 줄을 자기 경로로 고친다. 안 하면 없는 경로를 보고 조용히 실패한다.
+
 ## 3. Obsidian 일반 플러그인 (obsidian-git · terminal · tasks)
 
 `.obsidian/plugins/` 는 gitignore 라 clone 에 안 따라온다. 마켓에서 설치하거나

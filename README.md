@@ -65,7 +65,7 @@ scripts/       점검 스크립트 + 자동화
 **반드시 Private** — 위키에 개인·업무 내용이 쌓인다.
 
 ```bash
-git clone https://github.com/<내계정>/<내볼트>.git ~/my-vault
+git clone https://github.com/<내계정>/<내볼트>.git ~/second-brain
 ```
 
 Obsidian 에서 「폴더를 보관함으로 열기」.
@@ -73,16 +73,24 @@ Obsidian 에서 「폴더를 보관함으로 열기」.
 **2. 스킬 전역 등록** — 어느 디렉토리에서든 `/wiki-ingest` 가 잡히게:
 
 ```bash
+cd ~/second-brain
 ln -sfn "$PWD"/.claude/skills/wiki-* ~/.claude/skills/
 ```
 
 볼트 안에서만 쓸 거면 건너뛰어도 된다 — `.claude/skills/` 에 이미 있다.
-스크립트는 자기 위치로 볼트를 찾으므로 경로 설정이 따로 필요 없다.
+스크립트는 자기 위치로 볼트를 찾으므로 경로 설정이 필요 없지만, **스킬은 다르다** —
+전역 등록한 스킬은 볼트 밖에서도 불리므로 볼트 경로를 알아야 한다. 기본값이
+`~/second-brain` 이니 **다른 경로에 뒀으면 셸 설정에 알린다**:
 
-**3. Obsidian 플러그인 2개** (설치 후 **활성화까지**)
+```bash
+echo 'export VAULT_PATH="$HOME/my-vault"' >> ~/.zshrc   # 자기 경로로
+```
+
+**3. Obsidian 플러그인 3개** (설치 후 **활성화까지**)
 
 - **Git** — 버전 관리·백업
 - **Terminal** — 볼트 안에서 Claude Code 실행
+- **Tasks** — 일지 체크박스 (완료 취소선 스니펫이 이걸 전제한다)
 
 **4. (선택) Web Clipper** — 노트 이름 `{{date|date:"YYMMDD"}}-{{title}}`,
 저장 위치 `raw/external`(논문은 `raw/external/papers`).
@@ -97,7 +105,9 @@ git 은 파일 수정시각을 보존하지 않으므로 **날짜는 파일명�
 ## 자동화 — 사람이 안 불러도 도는 것
 
 기억력에 기대면 절차는 샌다. 그래서 **부르지 않아도 도는 것**을 따로 둔다.
-등록 절차(launchd·훅)는 기기별이라 git 에 안 따라온다 — `docs/machine-setup.md` 참고.
+
+⚠️ **아래 표는 clone 직후엔 하나도 돌지 않는다.** 등록 절차(launchd·Claude Code 훅)는
+기기별이라 git 에 안 따라온다 — 스크립트만 따라오고, 켜는 것은 `docs/machine-setup.md`.
 
 | 언제 | 무엇 |
 |---|---|
