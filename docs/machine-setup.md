@@ -1,0 +1,200 @@
+# 새 기기 세팅 — 볼트 밖에 사는 것들
+
+이 볼트는 clone 만으로 완성되지 않는다. 아래 항목들은 **git 에 없거나 기기별 등록이
+필요한 것들**이라, 기기를 바꾸면 이 문서대로 다시 세팅한다. (볼트 안 파일은 clone 이
+가져오고, Obsidian 플러그인 목록은 `.obsidian/community-plugins.json` 으로 따라온다 —
+여기 적는 건 그 바깥이다.)
+
+## 1. 볼트 clone + Obsidian
+
+```bash
+git clone https://github.com/<계정>/<내볼트>.git ~/second-brain
+export VAULT_PATH="$HOME/second-brain"   # 다른 경로에 뒀으면 여기서 알린다
+```
+
+- Obsidian 에서 「폴더를 보관함으로 열기」 → 볼트 폴더
+- 스크립트·훅은 `VAULT_PATH` 로 볼트를 찾는다 (기본값 `~/second-brain`) — 셸 프로필에 넣어 두면 launchd·훅도 같은 값을 본다
+- 커뮤니티 플러그인: 제한 모드 해제 → 플러그인 파일은 아래 3·4번에서 복사
+
+## 2. 전역 스킬 `wiki-*` (git 밖 — 2026-08-24 부터 전역 실파일)
+
+스킬 실파일은 볼트의 `.claude/skills/wiki-*` 에 있다. 볼트 밖에서도 부르려면
+홈으로 symlink 한다:
+
+```bash
+ln -sfn "$VAULT_PATH"/.claude/skills/wiki-* ~/.claude/skills/
+```
+
+볼트 안에서만 쓸 거면 이 단계는 필요 없다.
+
+## 3. Obsidian 일반 플러그인 (obsidian-git · terminal · tasks)
+
+`.obsidian/plugins/` 는 gitignore 라 clone 에 안 따라온다. 마켓에서 설치하거나
+이전 기기에서 폴더째 복사:
+
+```bash
+rsync -a oldmac:"$VAULT_PATH"/.obsidian/plugins/ "$VAULT_PATH"/.obsidian/plugins/
+```
+
+## 4. (선택) 캘린더 연동 — CalDAV 플러그인
+
+일지 「일정」 칸을 자동으로 채우고 싶을 때만 한다. 안 해도 나머지는 전부 돈다 —
+`generate-daily.py` 는 `캘린더/YYYY-MM.md` 가 없으면 일정 없이 일지를 만든다.
+
+CalDAV 를 읽어 `캘린더/YYYY-MM.md` 로 미러링하는 Obsidian 플러그인을 쓴다
+(조직마다 다르므로 여기서는 지정하지 않는다). 설정할 값:
+
+- Server URL: 쓰는 캘린더 서버의 CalDAV 주소
+- Username / Password: 그 계정 (플러그인이 localStorage 에만 저장 — 기기마다 재입력)
+- 캘린더 목록을 불러와 미러할 캘린더 선택
+
+⚠️ `캘린더/` 는 `.gitignore` 대상이다 — 5분마다 재생성되므로 추적하면 커밋 노이즈가 되고,
+일정이 원격 레포에 쌓인다.
+
+## 5. 일지 자동 생성 launchd (매일 07:00, 당일)
+
+스크립트는 볼트에 있고(`scripts/generate-daily.py`) **스케줄 등록만 기기별**이다:
+
+```bash
+cat > ~/Library/LaunchAgents/com.user.wiki-daily-gen.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.user.wiki-daily-gen</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>"$VAULT_PATH"/scripts/generate-daily.py</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key><integer>7</integer>
+        <key>Minute</key><integer>0</integer>
+    </dict>
+    <key>RunAtLoad</key><false/>
+    <key>StandardOutPath</key><string>/tmp/wiki-daily-gen.log</string>
+    <key>StandardErrorPath</key><string>/tmp/wiki-daily-gen.log</string>
+</dict>
+</plist>
+EOF
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-daily-gen.plist
+```
+
+관리:
+
+```bash
+launchctl list | grep wiki-daily                              # 등록 확인
+launchctl kickstart gui/$(id -u)/com.user.wiki-daily-gen      # 즉시 실행 (테스트)
+launchctl bootout gui/$(id -u)/com.user.wiki-daily-gen        # 해제
+cat /tmp/wiki-daily-gen.log                                   # 마지막 실행 로그
+```
+
+## 5.1 위키 lint 자동 점검 launchd (매일 08:30)
+
+스크립트는 볼트에 있고(`scripts/lint_morning.py`) **스케줄 등록만 기기별**이다.
+정답이 하나뿐인 것만 고치고 나머지는 그날 일지 「이슈」로 넘긴다 (규약 §8.1):
+
+```bash
+cat > ~/Library/LaunchAgents/com.user.wiki-lint.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.user.wiki-lint</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/bin/python3</string>
+        <string>"$VAULT_PATH"/scripts/lint_morning.py</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>
+    <key>RunAtLoad</key><false/>
+    <key>StandardOutPath</key><string>/tmp/wiki-lint.log</string>
+    <key>StandardErrorPath</key><string>/tmp/wiki-lint.log</string>
+</dict>
+</plist>
+EOF
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-lint.plist
+```
+
+관리는 일지 생성기와 같다 (`launchctl list | grep wiki` · `kickstart` · `bootout`).
+동작 확인은 `python3 scripts/lint_morning.py --dry-run` — 일지·log·커밋 없이 결과만 본다.
+
+## 5.2 무인 ingest launchd (매일 08:00)
+
+훅이 채운 `inbox/` 를 매일 아침 자동으로 비운다 — 1~4단계만 하고 5단계(기존 페이지 수정)는
+사람이 "반영해줘" 할 때 대화형으로 (규약 §6.2). 점검(08:30)보다 **먼저** 돌아야 한다:
+
+```bash
+cat > ~/Library/LaunchAgents/com.user.wiki-ingest.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key><string>com.user.wiki-ingest</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/bash</string>
+        <string>"$VAULT_PATH"/scripts/ingest_morning.sh</string>
+    </array>
+    <key>StartCalendarInterval</key>
+    <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
+    <key>RunAtLoad</key><false/>
+    <key>StandardOutPath</key><string>/tmp/wiki-ingest.log</string>
+    <key>StandardErrorPath</key><string>/tmp/wiki-ingest.log</string>
+</dict>
+</plist>
+EOF
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-ingest.plist
+```
+
+동작 확인은 `./scripts/ingest_morning.sh --dry-run` — 대상만 세고 claude 를 부르지 않는다.
+훅 산출물이 없으면 토큰을 쓰지 않고 즉시 종료한다.
+
+## 6. 세션 요약 훅 (SessionEnd → inbox)
+
+어느 프로젝트든 Claude 세션이 끝나면 요약을 볼트 inbox 로 떨구는 훅.
+스크립트는 볼트에 있고(`scripts/session-to-inbox.py`) **등록만 기기별**이다 —
+`~/.claude/settings.json` 의 `hooks.SessionEnd` 에:
+
+```json
+{"hooks": [{"type": "command", "command": "python3 "$VAULT_PATH"/scripts/session-to-inbox.py", "timeout": 20}]}
+```
+
+## 6.1 볼트 잔량 훅 (SessionStart → 미처리 알림)
+
+무인 ingest·무인 점검이 자기 권한 밖이라 일지 「볼트」에 남긴 잔여 작업을, 세션이
+열릴 때 컨텍스트로 올린다. `~/.claude/settings.json` 의 `hooks.SessionStart` 에
+**두 군데** — `matcher: "startup"` 과 `matcher: "resume|clear"` — 로 등록한다
+(`startup` 만 걸면 `--resume` 이나 `/clear` 로 이어간 세션에서 안 뜬다):
+
+```json
+{"type": "command", "command": "python3 "$VAULT_PATH"/scripts/vault_backlog_hook.py", "timeout": 10}
+```
+
+세션 요약 훅과 같은 짝이다 — 끝날 때 inbox 로 넣고(§6), 열 때 잔량을 꺼낸다.
+**보고만 하고 실행은 사람이 승인한 뒤** 대화형으로 한다 (규약 §6.2·§8.1 의 무인 권한
+범위를 우회하지 않기 위해). 미처리가 없으면 침묵하고, 같은 잔량은 하루 1회만 알린다
+(상태: `~/.claude/.vault-backlog-state.json` — 지우면 다시 알린다).
+
+## 7. 로컬 전용 raw 데이터
+
+`raw/` 의 로컬 채널(conversations·notes·docs·personal·assets)과 `inbox/` 는
+**git 에 없다** — 이전 기기에서 직접 옮겨야 한다:
+
+```bash
+rsync -a oldmac:"$VAULT_PATH"/raw/ "$VAULT_PATH"/raw/
+rsync -a oldmac:"$VAULT_PATH"/inbox/ "$VAULT_PATH"/inbox/
+```
+
+⚠️ 이 데이터의 평시 백업은 Time Machine 뿐이다 — 새 기기에서 Time Machine 이
+켜져 있는지 같이 확인할 것.
+
+## 8. 확인
+
+```bash
+cd "$VAULT_PATH" && python3 scripts/lint_all.py                          # lint 전종
+python3 scripts/generate-daily.py                                        # 일지 생성 동작
+```

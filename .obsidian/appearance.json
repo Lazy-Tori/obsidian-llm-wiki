@@ -1,0 +1,8 @@
+{
+  "theme": "system",
+  "cssTheme": "",
+  "accentColor": "#45d9d6",
+  "enabledCssSnippets": [
+    "daily-task-strikethrough"
+  ]
+}

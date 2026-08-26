@@ -1,0 +1,49 @@
+# Obsidian: 기기별 상태 파일 (열린 탭·창 배치 등 — 기기마다 달라 충돌만 남김)
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/cache
+
+# Obsidian: 플러그인·테마 바이너리 (각 기기에서 재설치)
+# community-plugins.json 은 추적되므로 설치할 플러그인 목록은 공유됨
+.obsidian/plugins/
+.obsidian/themes/
+
+# 로컬 전용 원본 — 사내 정보 포함, 외부(GitHub)로 내보내지 않는다.
+# 규칙 한 줄: **외부 공개물 채널(external) 하나만 추적**, 나머지 채널은 전부 로컬.
+# (2026-08-24 개편: 논문은 external/papers/ 하위 폴더 — 취급이 같아 채널을 늘리지 않는다)
+# assets 는 사내 다이어그램·스크린샷이 들어오는 자리라 로컬이다 (2026-08-18) —
+# 같은 사내 문서가 텍스트면 로컬인데 스크린샷이면 공개되는 구멍을 막는다.
+# 공개해도 되는 첨부는 external/ 에 원문과 함께 둔다.
+# .gitkeep 만 예외로 남겨 다른 기기에서 clone 해도 폴더 구조가 재현되게 한다
+raw/assets/*
+!raw/assets/.gitkeep
+raw/conversations/*
+!raw/conversations/.gitkeep
+raw/notes/*
+!raw/notes/.gitkeep
+raw/docs/*
+!raw/docs/.gitkeep
+raw/personal/*
+!raw/personal/.gitkeep
+!raw/personal/credentials
+raw/personal/credentials/*
+!raw/personal/credentials/.gitkeep
+
+# Obsidian: 휴지통
+.trash/
+
+# macOS
+.DS_Store
+
+# Python: scripts/ 실행 부산물
+__pycache__/
+.ruff_cache/
+
+# 수집 버퍼 — 분류 전 자료라 사내 정보가 섞일 수 있어 로컬 전용
+# (ingest 가 raw/ 로 옮기면서 분류·공개 여부가 그때 정해진다)
+inbox/*
+!inbox/.gitkeep
+
+# 사내 캘린더 미러 — CalDAV 플러그인이 5분 주기로 재생성. 추적하면 동기화마다
+# 커밋 노이즈 + 사내 일정이 원격에 쌓인다. 원본은 사내 캘린더 서버에 있다
+캘린더/
