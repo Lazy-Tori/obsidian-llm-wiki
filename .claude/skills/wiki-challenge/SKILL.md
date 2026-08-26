@@ -6,7 +6,9 @@ description: 사용자가 내놓은 아이디어·계획·결정을 이 볼트�
 # wiki-challenge — 내 과거 기록으로 내 현재 판단을 반박한다
 
 ```bash
-VAULT="${VAULT_PATH:-$HOME/second-brain}"   # 어느 디렉토리에서 부르든 이 볼트가 대상
+# 어느 디렉토리에서 부르든 이 볼트가 대상.
+# 설치할 때 자기 볼트 경로로 고치거나 VAULT_PATH 를 내보낸다
+VAULT="${VAULT_PATH:-$HOME/second-brain}"
 ```
 
 Claude 에게 맨몸으로 물으면 일반론이 온다. 이 스킬은 **내가 실제로 겪어서 적어둔 것**만

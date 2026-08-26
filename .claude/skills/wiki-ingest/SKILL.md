@@ -6,7 +6,9 @@ description: 개인 세컨드 브레인 위키(Obsidian 볼트)에 소스를 소
 # wiki-ingest — 소스를 위키에 소화시킨다
 
 ```bash
-VAULT="${VAULT_PATH:-$HOME/second-brain}"   # 어느 디렉토리에서 부르든 이 볼트가 대상
+# 어느 디렉토리에서 부르든 이 볼트가 대상.
+# 설치할 때 자기 볼트 경로로 고치거나 VAULT_PATH 를 내보낸다
+VAULT="${VAULT_PATH:-$HOME/second-brain}"
 ```
 
 ## 절차는 볼트에 있다

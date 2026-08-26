@@ -13,7 +13,10 @@ export VAULT_PATH="$HOME/second-brain"   # 다른 경로에 뒀으면 여기서 
 ```
 
 - Obsidian 에서 「폴더를 보관함으로 열기」 → 볼트 폴더
-- 스크립트·훅은 `VAULT_PATH` 로 볼트를 찾는다 (기본값 `~/second-brain`) — 셸 프로필에 넣어 두면 launchd·훅도 같은 값을 본다
+- 스크립트는 **자기 위치(`볼트/scripts/`)로 볼트를 스스로 찾는다** — 환경변수 없이도 돈다.
+  `VAULT_PATH` 는 스크립트를 볼트 밖에 두고 쓸 때의 덮어쓰기용이다.
+  ⚠️ launchd·GUI 앱은 셸 프로필(`.zshrc`)을 읽지 않는다 — 아래 등록 스니펫이 **절대경로를
+  파일에 박아 넣는** 이유다.
 - 커뮤니티 플러그인: 제한 모드 해제 → 플러그인 파일은 아래 3·4번에서 복사
 
 ## 2. 전역 스킬 `wiki-*` (git 밖 — 2026-08-24 부터 전역 실파일)
@@ -53,10 +56,16 @@ CalDAV 를 읽어 `캘린더/YYYY-MM.md` 로 미러링하는 Obsidian 플러그�
 
 ## 5. 일지 자동 생성 launchd (매일 07:00, 당일)
 
+아래 5·5.1·5.2 는 **볼트 폴더 안에서** 실행한다 — `$VAULT` 가 plist 에 절대경로로 박힌다:
+
+```bash
+cd ~/second-brain && VAULT="$PWD"   # 자기 볼트 경로로
+```
+
 스크립트는 볼트에 있고(`scripts/generate-daily.py`) **스케줄 등록만 기기별**이다:
 
 ```bash
-cat > ~/Library/LaunchAgents/com.user.wiki-daily-gen.plist << 'EOF'
+cat > ~/Library/LaunchAgents/com.user.wiki-daily-gen.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -66,7 +75,7 @@ cat > ~/Library/LaunchAgents/com.user.wiki-daily-gen.plist << 'EOF'
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>"$VAULT_PATH"/scripts/generate-daily.py</string>
+        <string>$VAULT/scripts/generate-daily.py</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict>
@@ -97,7 +106,7 @@ cat /tmp/wiki-daily-gen.log                                   # 마지막 실행
 정답이 하나뿐인 것만 고치고 나머지는 그날 일지 「이슈」로 넘긴다 (규약 §8.1):
 
 ```bash
-cat > ~/Library/LaunchAgents/com.user.wiki-lint.plist << 'EOF'
+cat > ~/Library/LaunchAgents/com.user.wiki-lint.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -106,7 +115,7 @@ cat > ~/Library/LaunchAgents/com.user.wiki-lint.plist << 'EOF'
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>"$VAULT_PATH"/scripts/lint_morning.py</string>
+        <string>$VAULT/scripts/lint_morning.py</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>30</integer></dict>
@@ -128,7 +137,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-lint.plist
 사람이 "반영해줘" 할 때 대화형으로 (규약 §6.2). 점검(08:30)보다 **먼저** 돌아야 한다:
 
 ```bash
-cat > ~/Library/LaunchAgents/com.user.wiki-ingest.plist << 'EOF'
+cat > ~/Library/LaunchAgents/com.user.wiki-ingest.plist <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -137,7 +146,7 @@ cat > ~/Library/LaunchAgents/com.user.wiki-ingest.plist << 'EOF'
     <key>ProgramArguments</key>
     <array>
         <string>/bin/bash</string>
-        <string>"$VAULT_PATH"/scripts/ingest_morning.sh</string>
+        <string>$VAULT/scripts/ingest_morning.sh</string>
     </array>
     <key>StartCalendarInterval</key>
     <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
@@ -160,7 +169,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-ingest.pli
 `~/.claude/settings.json` 의 `hooks.SessionEnd` 에:
 
 ```json
-{"hooks": [{"type": "command", "command": "python3 "$VAULT_PATH"/scripts/session-to-inbox.py", "timeout": 20}]}
+{"hooks": [{"type": "command", "command": "python3 /Users/<계정>/<볼트>/scripts/session-to-inbox.py", "timeout": 20}]}
 ```
 
 ## 6.1 볼트 잔량 훅 (SessionStart → 미처리 알림)
@@ -171,7 +180,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-ingest.pli
 (`startup` 만 걸면 `--resume` 이나 `/clear` 로 이어간 세션에서 안 뜬다):
 
 ```json
-{"type": "command", "command": "python3 "$VAULT_PATH"/scripts/vault_backlog_hook.py", "timeout": 10}
+{"type": "command", "command": "python3 /Users/<계정>/<볼트>/scripts/vault_backlog_hook.py", "timeout": 10}
 ```
 
 세션 요약 훅과 같은 짝이다 — 끝날 때 inbox 로 넣고(§6), 열 때 잔량을 꺼낸다.

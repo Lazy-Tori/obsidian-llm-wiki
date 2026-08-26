@@ -70,33 +70,27 @@ git clone https://github.com/<내계정>/<내볼트>.git ~/my-vault
 
 Obsidian 에서 「폴더를 보관함으로 열기」.
 
-**2. 볼트 경로를 알린다** — 스크립트와 스킬은 **어느 디렉토리에서 불려도** 볼트를
-찾아야 한다. 기본값은 `~/second-brain` 이고, 다른 곳에 뒀으면 환경변수로 알린다:
-
-```bash
-echo 'export VAULT_PATH="$HOME/my-vault"' >> ~/.zshrc && source ~/.zshrc
-```
-
-**3. 스킬 전역 등록** — 어느 디렉토리에서든 `/wiki-ingest` 가 잡히게:
+**2. 스킬 전역 등록** — 어느 디렉토리에서든 `/wiki-ingest` 가 잡히게:
 
 ```bash
 ln -sfn "$PWD"/.claude/skills/wiki-* ~/.claude/skills/
 ```
 
-볼트 안에서만 쓸 거면 이 단계는 건너뛰어도 된다 — `.claude/skills/` 에 이미 있다.
+볼트 안에서만 쓸 거면 건너뛰어도 된다 — `.claude/skills/` 에 이미 있다.
+스크립트는 자기 위치로 볼트를 찾으므로 경로 설정이 따로 필요 없다.
 
-**4. Obsidian 플러그인 2개** (설치 후 **활성화까지**)
+**3. Obsidian 플러그인 2개** (설치 후 **활성화까지**)
 
 - **Git** — 버전 관리·백업
 - **Terminal** — 볼트 안에서 Claude Code 실행
 
-**5. (선택) Web Clipper** — 노트 이름 `{{date|date:"YYMMDD"}}-{{title}}`,
+**4. (선택) Web Clipper** — 노트 이름 `{{date|date:"YYMMDD"}}-{{title}}`,
 저장 위치 `raw/external`(논문은 `raw/external/papers`).
 git 은 파일 수정시각을 보존하지 않으므로 **날짜는 파일명에 남겨야 남는다.**
 
-**6. (선택) 자동화 등록** — 아래 「자동화」 참고. `docs/machine-setup.md` 에 절차가 있다.
+**5. (선택) 자동화 등록** — 아래 「자동화」 참고. `docs/machine-setup.md` 에 절차가 있다.
 
-**7. `CLAUDE.md` 를 내 목적에 맞게 깎는다** — 가장 중요하다.
+**6. `CLAUDE.md` 를 내 목적에 맞게 깎는다** — 가장 중요하다.
 이 템플릿의 규약은 "시도 → 경험 → 배움 → 산출물"을 축으로 좁혀져 있다.
 축이 다르면 페이지 타입부터 바꿔야 한다.
 

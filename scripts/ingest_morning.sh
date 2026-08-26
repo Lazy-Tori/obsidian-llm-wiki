@@ -12,7 +12,8 @@
 #     ./scripts/ingest_morning.sh --dry-run    # 대상만 세고 종료 (claude 호출 없음)
 
 set -u
-VAULT="${VAULT_PATH:-$HOME/second-brain}"   # 볼트 경로 — VAULT_PATH 로 덮어쓴다
+# 자기 위치(볼트/scripts/)로 볼트를 찾는다. VAULT_PATH 로 덮어쓸 수 있다
+VAULT="${VAULT_PATH:-$(cd "$(dirname "$0")/.." && pwd)}"
 cd "$VAULT" || exit 1
 
 # 훅 산출물만 센다. 없으면 토큰을 쓰지 않고 즉시 끝낸다

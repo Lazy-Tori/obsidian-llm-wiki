@@ -6,7 +6,9 @@ description: 최근 위키 변화에서 아직 이름이 붙지 않은 패턴을
 # wiki-emerge — 아직 이름 붙지 않은 것을 찾는다
 
 ```bash
-VAULT="${VAULT_PATH:-$HOME/second-brain}"   # 어느 디렉토리에서 부르든 이 볼트가 대상
+# 어느 디렉토리에서 부르든 이 볼트가 대상.
+# 설치할 때 자기 볼트 경로로 고치거나 VAULT_PATH 를 내보낸다
+VAULT="${VAULT_PATH:-$HOME/second-brain}"
 ```
 
 승격과 이름 붙이기는 이 볼트의 핵심 동학인데 **아무도 발동시키지 않으면 일어나지 않는다.**

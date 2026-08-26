@@ -23,7 +23,10 @@ import sys
 from datetime import date
 from pathlib import Path
 
-VAULT = Path(os.environ.get("VAULT_PATH", "~/second-brain")).expanduser()  # 볼트 경로 — VAULT_PATH 로 덮어쓴다
+# 이 스크립트는 볼트 안(scripts/)에 살므로 자기 위치로 볼트를 찾는다 —
+# 훅은 임의의 디렉토리에서 불리기 때문에 cwd 에 기댈 수 없다.
+# 심볼릭 링크 등으로 밖에 두고 쓸 때만 VAULT_PATH 로 덮어쓴다.
+VAULT = Path(os.environ.get("VAULT_PATH") or Path(__file__).resolve().parent.parent).expanduser()
 STATE = Path.home() / ".claude" / ".vault-backlog-state.json"
 
 SECTION = re.compile(r"^## 볼트\s*$(.*?)(?=^## |\Z)", re.M | re.DOTALL)
