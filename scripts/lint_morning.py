@@ -4,13 +4,14 @@
 흐름:
   1. `lint_autofix.py` — 정답이 하나뿐인 것만 고친다 (LLM 없음, 결정론적)
   2. `lint_all.py --json` — 남은 발견을 수집
-  3. 남은 것을 **그날 일지 「이슈」**에 체크박스로 적는다 (위키 다른 곳은 안 건드림)
+  3. 남은 것을 **그날 일지 「볼트」**에 체크박스로 적는다 (위키 다른 곳은 안 건드림).
+     「이슈」는 사람의 업무 이슈 전용이라 기계가 쓰지 않는다 — 쓰면 그 칸이 점검 로그가 된다
   4. 고친 게 있으면 `log.md` 기록 + `auto-lint |` 커밋
 
-⚠️ **수정 권한은 여기서 끝난다.** 이슈에 적힌 것은 사람이 "고쳐줘" 라고 해야 손댄다 —
+⚠️ **수정 권한은 여기서 끝난다.** 「볼트」에 적힌 것은 사람이 "고쳐줘" 라고 해야 손댄다 —
 문장을 쓰거나 의도를 추측해야 하는 것들이라, 무인이 건드리면 되돌릴 근거가 안 남는다.
 
-⚠️ 일지 「이슈」는 **이월되지 않는다** (carryover 는 「해야할일」만 읽는다). 대신 매일
+⚠️ 일지 「볼트」는 **이월되지 않는다** (carryover 는 「해야할일」만 읽는다). 대신 매일
 아침 재검사에서 문제가 남아 있으면 같은 줄을 다시 적으므로, 고칠 때까지 계속 나타나고
 고치면 저절로 사라진다 — 이월보다 정확하다. 같은 줄이 이미 있으면 중복 추가하지 않는다.
 
@@ -34,7 +35,7 @@ DAILY = ROOT / "wiki" / "daily"
 LOG = ROOT / "log.md"
 MARK = "- [ ] lint("  # 일지에 적는 줄의 표식 — 자기 참조 판정에 쓴다
 
-# 이슈에 적을 때 쓰는 사람이 읽는 이름
+# 일지 「볼트」에 적을 때 쓰는 사람이 읽는 이름
 LABEL = {
     "lint-links": "링크",
     "lint-backlinks": "역링크",
@@ -79,12 +80,12 @@ def findings() -> list[str]:
     return lines
 
 
-def write_issues(lines: list[str], dry: bool) -> list[str]:
+def write_vault_entries(lines: list[str], dry: bool) -> list[str]:
     """그날 일지 「볼트」에 체크박스로 적는다 (「이슈」는 사람의 업무 이슈 전용). 일지가 없으면 만들지 않는다 —
     일지 생성은 generate-daily.py 의 일이고, 07:00 에 이미 돌았어야 한다."""
     path = DAILY / f"{date.today():%Y-%m-%d}.md"
     if not path.exists():
-        return [f"(일지 {path.stem} 없음 — 이슈를 적지 못했다)"]
+        return [f"(일지 {path.stem} 없음 — 「볼트」에 적지 못했다)"]
 
     text = path.read_text(encoding="utf-8")
     m = re.search(r"^## 볼트\s*$(.*?)(?=^## |\Z)", text, re.M | re.DOTALL)
@@ -96,7 +97,7 @@ def write_issues(lines: list[str], dry: bool) -> list[str]:
     for line in lines:
         # ⚠️ 줄에 날짜를 박는 이유 (2026-08-25 실측):
         # 스탬프가 없으면 다음날 lint-freshness 가 이 줄을 「날짜 없는 휘발성 주장」으로
-        # 잡고, 그 발견이 다시 이슈로 적혀 **매일 줄이 불어나는 자기 참조 루프**가 된다.
+        # 잡고, 그 발견이 다시 「볼트」로 적혀 **매일 줄이 불어나는 자기 참조 루프**가 된다.
         # 날짜는 그 검사를 만족시키면서 "언제 처음 걸렸나" 도 알려준다
         entry = f"- [ ] lint({date.today():%Y-%m-%d}): {line}"
         # 같은 발견이 이미 있으면 다시 적지 않는다 (매일 재검사라 중복이 쌓인다)
@@ -113,15 +114,15 @@ def write_issues(lines: list[str], dry: bool) -> list[str]:
     return added
 
 
-def append_log(fixed: str, issues: list[str], dry: bool) -> None:
+def append_log(fixed: str, vault_items: list[str], dry: bool) -> None:
     if dry:
         return
     entry = [f"\n## [{date.today():%Y-%m-%d}] lint | 무인 실행\n"]
     entry.append(f"- 자동 수정: {fixed.strip() or '없음'}")
-    if issues:
-        entry.append(f"- 일지 「이슈」로 넘김 {len(issues)}건:")
-        entry += [f"  - {i.replace('- [ ] ', '')}" for i in issues]
-    entry.append("- 이슈 항목은 사람이 「고쳐줘」 라고 해야 손댄다 (규약 §8.1)")
+    if vault_items:
+        entry.append(f"- 일지 「볼트」로 넘김 {len(vault_items)}건:")
+        entry += [f"  - {i.replace('- [ ] ', '')}" for i in vault_items]
+    entry.append("- 「볼트」 항목은 사람이 「고쳐줘」 라고 해야 손댄다 (규약 §8.1)")
     LOG.write_text(
         LOG.read_text(encoding="utf-8") + "\n".join(entry) + "\n", encoding="utf-8"
     )
@@ -159,16 +160,16 @@ def main() -> int:
     print(fixed_out)
 
     # 자동 수정기가 "거부" 한 항목(inbox 미처리 등)은 lint 원문보다 행동이 분명하다.
-    # 그쪽 문장을 그대로 이슈에 싣는다
+    # 그쪽 문장을 그대로 일지 「볼트」에 싣는다
     deferred = [
         ln.replace("⚠️", "").strip() for ln in fixed_out.splitlines() if "⚠️" in ln
     ]
     remaining = deferred + findings()
-    issues = write_issues(remaining, dry) if remaining else []
+    vault_items = write_vault_entries(remaining, dry) if remaining else []
 
-    print("=== 일지 「이슈」 ===\n")
-    if issues:
-        for i in issues:
+    print("=== 일지 「볼트」 ===\n")
+    if vault_items:
+        for i in vault_items:
             print(f"  {i}")
     elif remaining:
         print("  (이미 적혀 있음 — 중복 추가 안 함)")
@@ -177,7 +178,7 @@ def main() -> int:
 
     mine = dirty() - before  # 이 실행이 만든 변경만
     if mine and not dry:
-        append_log(fixed_out, issues, dry)
+        append_log(fixed_out, vault_items, dry)
         mine |= {"log.md"}
         commit(mine, dry)
         print(f"\n커밋: {', '.join(sorted(mine))}")
