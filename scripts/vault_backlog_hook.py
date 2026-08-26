@@ -11,6 +11,13 @@
 조용함 규칙:
 - 미처리 줄이 없으면 아무것도 출력하지 않는다 (무관한 프로젝트 세션에서의 소음 방지)
 - 같은 잔량은 하루 1회만. 잔량이 바뀌면 그날 안이라도 다시 알린다
+- **사람이 없는 세션에서는 침묵한다** (`VAULT_HOOK_SILENT` / `claude -p`)
+
+⚠️ 마지막 규칙의 이유 (2026-08-26 실측): 이 알림은 사람에게 승인을 구하는 말인데,
+`claude -p` 로 도는 자동화(세션 요약기·무인 ingest)에도 그대로 주입됐다. 요약기는
+자기 컨텍스트에 들어온 이 잔여 작업을 **요약 대상 세션의 「다음 할 일」로 적었고**,
+그 소스 페이지가 다시 위키로 들어왔다 — 기계가 쓴 줄을 기계가 다시 읽는 되먹임.
+근본 수정은 주입 단계에서 끊는 것이다(요약 프롬프트를 손보는 게 아니라).
 """
 
 from __future__ import annotations
@@ -26,7 +33,9 @@ from pathlib import Path
 # 이 스크립트는 볼트 안(scripts/)에 살므로 자기 위치로 볼트를 찾는다 —
 # 훅은 임의의 디렉토리에서 불리기 때문에 cwd 에 기댈 수 없다.
 # 심볼릭 링크 등으로 밖에 두고 쓸 때만 VAULT_PATH 로 덮어쓴다.
-VAULT = Path(os.environ.get("VAULT_PATH") or Path(__file__).resolve().parent.parent).expanduser()
+VAULT = Path(
+    os.environ.get("VAULT_PATH") or Path(__file__).resolve().parent.parent
+).expanduser()
 STATE = Path.home() / ".claude" / ".vault-backlog-state.json"
 
 SECTION = re.compile(r"^## 볼트\s*$(.*?)(?=^## |\Z)", re.M | re.DOTALL)
@@ -86,7 +95,21 @@ def skill_for(line: str) -> str:
     return "wiki-ingest"
 
 
+def is_headless() -> bool:
+    """사람이 보고 있지 않은 세션인가 — 그러면 알릴 상대가 없다.
+
+    - `VAULT_HOOK_SILENT`: 볼트 자동화가 `claude -p` 를 띄울 때 직접 박는다 (확실한 신호)
+    - `CLAUDE_CODE_ENTRYPOINT == sdk-cli`: `claude -p`(print 모드)의 값. 대화형은 `cli` 다.
+      **모르는 값은 사람으로 취급한다** — 침묵이 기본값이 되면 알림이 조용히 죽는다
+    """
+    if os.environ.get("VAULT_HOOK_SILENT"):
+        return True
+    return os.environ.get("CLAUDE_CODE_ENTRYPOINT") == "sdk-cli"
+
+
 def main() -> int:
+    if is_headless():
+        return 0
     today = f"{date.today():%Y-%m-%d}"
     lines = backlog_lines(today)
     if not lines:

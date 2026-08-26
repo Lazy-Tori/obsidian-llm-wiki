@@ -59,12 +59,32 @@ CalDAV 를 읽어 `캘린더/YYYY-MM.md` 로 미러링하는 Obsidian 플러그�
 ⚠️ `캘린더/` 는 `.gitignore` 대상이다 — 5분마다 재생성되므로 추적하면 커밋 노이즈가 되고,
 일정이 원격 레포에 쌓인다.
 
+## launchd 환경의 함정 (5·5.1·5.2 를 등록하기 전에 읽는다)
+
+launchd 는 **셸 프로필을 읽지 않는다.** job 이 보는 것은
+`PATH=/usr/bin:/bin:/usr/sbin:/sbin` 뿐이다. 그래서 **사람이 셸에서 돌려 성공한 것은
+무인 실행의 검증이 아니다.** 실제로 이렇게 샜다 (2026-08-26):
+
+- **`python3` 가 시스템 파이썬** — 셸에서 쓰는 것과 다른 인터프리터로 돈다. plist 에
+  **인터프리터를 절대경로로 박는다**(아래 `$PY`). 무인 ingest 는 자기 세션 안에서 lint 를
+  돌리므로 `EnvironmentVariables` 로 `PYTHON_BIN` 을 넘겨 같은 것을 쓰게 한다
+- **`claude` 를 못 찾았다** — 무인 ingest 가 대상이 있는 날에도 아무것도 소화하지 못하고
+  있었다. `ingest_morning.sh` 가 절대경로로 확정한다 (`CLAUDE_BIN` 으로 지정 가능)
+- **세션 안에서 도는 플러그인 훅의 `node` 도 못 찾았다** — 같은 스크립트가 PATH 를 보강한다
+
+무인 job 은 셸이 아니라 **`launchctl kickstart` 로 확인한다**:
+
+```bash
+launchctl kickstart -p gui/$(id -u) com.user.<label> && sleep 5 && cat /tmp/<label>.log
+```
+
 ## 5. 일지 자동 생성 launchd (매일 07:00, 당일)
 
 아래 5·5.1·5.2 는 **볼트 폴더 안에서** 실행한다 — `$VAULT` 가 plist 에 절대경로로 박힌다:
 
 ```bash
 cd ~/second-brain && VAULT="$PWD"   # 자기 볼트 경로로
+PY="$(command -v python3.12 || command -v python3)"   # 3.12+ 권장. plist 에 절대경로로 박힌다
 ```
 
 스크립트는 볼트에 있고(`scripts/generate-daily.py`) **스케줄 등록만 기기별**이다:
@@ -79,7 +99,7 @@ cat > ~/Library/LaunchAgents/com.user.wiki-daily-gen.plist <<EOF
     <string>com.user.wiki-daily-gen</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>$PY</string>
         <string>$VAULT/scripts/generate-daily.py</string>
     </array>
     <key>StartCalendarInterval</key>
@@ -108,7 +128,7 @@ cat /tmp/wiki-daily-gen.log                                   # 마지막 실행
 ## 5.1 위키 lint 자동 점검 launchd (매일 08:30)
 
 스크립트는 볼트에 있고(`scripts/lint_morning.py`) **스케줄 등록만 기기별**이다.
-정답이 하나뿐인 것만 고치고 나머지는 그날 일지 「이슈」로 넘긴다 (규약 §8.1):
+정답이 하나뿐인 것만 고치고 나머지는 그날 일지 「볼트」로 넘긴다 (규약 §8.1):
 
 ```bash
 cat > ~/Library/LaunchAgents/com.user.wiki-lint.plist <<EOF
@@ -119,7 +139,7 @@ cat > ~/Library/LaunchAgents/com.user.wiki-lint.plist <<EOF
     <key>Label</key><string>com.user.wiki-lint</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/usr/bin/python3</string>
+        <string>$PY</string>
         <string>$VAULT/scripts/lint_morning.py</string>
     </array>
     <key>StartCalendarInterval</key>
@@ -153,6 +173,10 @@ cat > ~/Library/LaunchAgents/com.user.wiki-ingest.plist <<EOF
         <string>/bin/bash</string>
         <string>$VAULT/scripts/ingest_morning.sh</string>
     </array>
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PYTHON_BIN</key><string>$PY</string>
+    </dict>
     <key>StartCalendarInterval</key>
     <dict><key>Hour</key><integer>8</integer><key>Minute</key><integer>0</integer></dict>
     <key>RunAtLoad</key><false/>
@@ -192,6 +216,11 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-ingest.pli
 **보고만 하고 실행은 사람이 승인한 뒤** 대화형으로 한다 (규약 §6.2·§8.1 의 무인 권한
 범위를 우회하지 않기 위해). 미처리가 없으면 침묵하고, 같은 잔량은 하루 1회만 알린다
 (상태: `~/.claude/.vault-backlog-state.json` — 지우면 다시 알린다).
+
+⚠️ **사람이 없는 세션에서는 침묵한다** — `claude -p`(entrypoint `sdk-cli`)이거나
+`VAULT_HOOK_SILENT` 이 설정된 경우. 안 그러면 이 알림이 세션 요약기·무인 ingest 의
+컨텍스트로 들어가 그 산출물에 섞인다 (2026-08-26 실측). 모르는 entrypoint 는 사람으로
+취급한다 — 침묵이 기본값이 되면 알림이 조용히 죽는다.
 
 ## 7. 로컬 전용 raw 데이터
 

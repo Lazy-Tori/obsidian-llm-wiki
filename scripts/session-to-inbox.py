@@ -40,7 +40,9 @@ from pathlib import Path
 # 이 스크립트는 볼트 안(scripts/)에 살므로 자기 위치로 볼트를 찾는다 —
 # 훅은 임의의 디렉토리에서 불리기 때문에 cwd 에 기댈 수 없다.
 # 심볼릭 링크 등으로 밖에 두고 쓸 때만 VAULT_PATH 로 덮어쓴다.
-VAULT = Path(os.environ.get("VAULT_PATH") or Path(__file__).resolve().parent.parent).expanduser()
+VAULT = Path(
+    os.environ.get("VAULT_PATH") or Path(__file__).resolve().parent.parent
+).expanduser()
 INBOX = VAULT / "inbox"
 INDEX = VAULT / "index.md"
 LINE_MAX = 120  # 요청 목차는 첫 줄 120자로 압축 — 원문은 transcript 에 있다
@@ -567,12 +569,16 @@ def main() -> None:
     if os.environ.get("SESSION_TO_INBOX_NO_BG"):
         return  # 대량 백필용 — 호출자가 --summarize 동시성을 직접 제어한다
     # 2단계: 기록 생성은 분리된 프로세스로 — 훅 타임아웃과 세션 종료를 막지 않는다
+    # VAULT_HOOK_SILENT: 요약기가 띄우는 `claude -p` 세션의 SessionStart 훅을 재운다.
+    # 안 재우면 볼트 잔여 작업 알림이 요약기 컨텍스트로 들어가, 요약 대상 세션의
+    # 「다음 할 일」로 적혀 위키로 되돌아온다 (2026-08-26 실측)
     subprocess.Popen(
         [sys.executable, __file__, "--summarize", str(out), str(transcript)],
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
+        env={**os.environ, "VAULT_HOOK_SILENT": "1"},
     )
 
 

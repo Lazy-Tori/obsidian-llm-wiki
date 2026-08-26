@@ -34,7 +34,37 @@ if [ "${1:-}" = "--dry-run" ]; then
     exit 0
 fi
 
-claude -p "/wiki-ingest 무인 모드로 실행한다. 규약 docs/wiki-conventions.md §6.2 의 권한을 지켜라.
+# ⚠️ launchd 는 셸 프로필을 읽지 않는다 — PATH 가 /usr/bin:/bin:/usr/sbin:/sbin 뿐이라
+# `claude`(~/.local/bin)를 못 찾는다. 2026-08-26 까지 08:00 무인 ingest 가 대상이 있는
+# 날에도 아무것도 소화하지 못한 원인이다 (사람이 셸에서 돌릴 때만 됐다).
+#
+# 두 겹으로 막는다:
+# ① PATH 보강 — 이 세션 안에서 도는 **플러그인 훅**도 PATH 를 물려받는다. 보강 전에는
+#    node 를 쓰는 훅이 `node: command not found` 로 죽었다 (2026-08-26 실측)
+# ② claude 는 절대경로로 확정 — PATH 에 없더라도 도는 게 낫다
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+CLAUDE_BIN="${CLAUDE_BIN:-$(command -v claude || true)}"
+for cand in "$HOME/.local/bin/claude" /opt/homebrew/bin/claude /usr/local/bin/claude; do
+    [ -x "$CLAUDE_BIN" ] && break
+    CLAUDE_BIN="$cand"
+done
+if [ ! -x "$CLAUDE_BIN" ]; then
+    echo "[$(date '+%F %T')] ⚠️ claude 실행파일을 못 찾았다 — 중단 (CLAUDE_BIN 으로 지정 가능)"
+    exit 127
+fi
+echo "[$(date '+%F %T')] claude: $CLAUDE_BIN"
+
+# 이 세션 안에서 lint 를 돌릴 인터프리터. launchd 의 맨 PATH 에서 `python3` 는 시스템
+# 파이썬(3.9)이라, plist 가 쓰는 것과 다른 인터프리터로 검증하게 된다. plist 가
+# EnvironmentVariables 로 PYTHON_BIN 을 넘기면 그것을, 없으면 PATH 의 python3 를 쓴다
+PY="${PYTHON_BIN:-python3}"
+echo "[$(date '+%F %T')] python: $PY ($("$PY" -V 2>&1))"
+
+# 이 세션은 사람이 안 보는 세션이다 — SessionStart 훅의 볼트 잔여 작업 알림을 재운다.
+# 안 재우면 그 알림이 무인 ingest 컨텍스트로 들어가 소화 결과에 섞인다 (2026-08-26)
+export VAULT_HOOK_SILENT=1
+
+"$CLAUDE_BIN" -p "/wiki-ingest 무인 모드로 실행한다. 규약 docs/wiki-conventions.md §6.2 의 권한을 지켜라.
 
 대상: inbox/ 의 훅 산출물(파일명에 -세션- 또는 -문서- 가 있는 것)만. 사용자가 직접 넣은
 다른 파일은 읽지도 옮기지도 마라.
@@ -50,10 +80,10 @@ lesson confidence 변경 금지.
 '- [ ] ingest(날짜): 세션 N건 소화됨 — [[배치 소스]] / 영향 후보: [[A]] · [[B]]'
 같은 줄이 이미 있으면 중복 추가하지 마라.
 
-마지막에 python3 scripts/lint_all.py 로 검증하고, 자기가 만진 파일만 'auto-ingest | 날짜' 로 커밋해라." \
+마지막에 $PY scripts/lint_all.py 로 검증하고, 자기가 만진 파일만 'auto-ingest | 날짜' 로 커밋해라." \
     --permission-mode acceptEdits \
-    --allowedTools "Bash(python3 scripts/lint_all.py)" \
-                   "Bash(python3 scripts/lint_autofix.py:*)" \
+    --allowedTools "Bash($PY scripts/lint_all.py)" \
+                   "Bash($PY scripts/lint_autofix.py:*)" \
                    "Bash(git add:*)" "Bash(git commit:*)" "Bash(git status:*)" \
                    "Bash(git mv:*)" "Bash(mv:*)" "Bash(ls:*)"
 
