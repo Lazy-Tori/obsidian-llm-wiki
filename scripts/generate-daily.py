@@ -81,8 +81,6 @@ tags: []
 ## 정해진 것
 
 ## 이슈
-
-## 볼트
 """
 
 
@@ -141,7 +139,7 @@ def merge_into_today(path: Path, events: list[str], todos: list[str]) -> bool:
         def core(s: str) -> str:
             return CARRIED.sub("", s).strip()
 
-        existing = {core(l) for l in body.splitlines()}
+        existing = {core(ln) for ln in body.splitlines()}
         missing = [i for i in items if core(i) not in existing]
         if not missing:
             return txt
@@ -170,7 +168,11 @@ def reserved_todos(today) -> list[str]:
     for line in lines:
         m = pat.match(line.strip())
         if m and m.group(1) <= today.isoformat():
-            marker = "" if m.group(1) == today.isoformat() else f" ({m.group(1)[5:].replace('-', '-')}~)"
+            marker = (
+                ""
+                if m.group(1) == today.isoformat()
+                else f" ({m.group(1)[5:]}~)"
+            )
             due.append(f"- [ ] {m.group(2)}{marker}")
         else:
             keep.append(line)
@@ -182,12 +184,18 @@ def reserved_todos(today) -> list[str]:
 def is_empty_daily(text: str) -> bool:
     """사용자 내용이 전혀 없는 골격인가 — 일정조차 없으면 빈 일지다."""
     for sec in ("일정", "해야할일", "작업", "정해진 것", "이슈"):
-        # 「볼트」는 뺀다 — 자동화가 적은 줄은 사람의 기록이 아니라 빈 일지 판정 근거가 못 된다
+        # 기계 줄은 애초에 일지에 없다 — 무인 실행이 남기는 사람 몫은
+        # `볼트-백로그.md` 로
+        # 간다 (2026-09-10 「볼트」 칸 폐지, 규약 §11)
         m = re.search(rf"## {sec}\n(.*?)(?=\n## |\Z)", text, re.DOTALL)
         if not m:
             continue
         body = m.group(1).replace("(일정 없음)", "").strip()
-        lines = [l.strip() for l in body.splitlines() if l.strip() and l.strip() != "- [ ]"]
+        lines = [
+            ln.strip()
+            for ln in body.splitlines()
+            if ln.strip() and ln.strip() != "- [ ]"
+        ]
         if lines:
             return False
     return True
