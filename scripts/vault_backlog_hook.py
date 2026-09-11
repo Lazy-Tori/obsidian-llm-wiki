@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""세션 시작 훅 — 오늘 일지 「볼트」의 미처리 줄을 컨텍스트로 주입한다.
+"""세션 시작 훅 — 볼트 백로그(`볼트-백로그.md`)의 미처리 줄을 컨텍스트로 주입한다.
 
 무인 ingest(08:00)·무인 점검(08:30)이 자기 권한 밖이라 남긴 잔여 작업을,
 사람이 Claude Code 를 여는 순간 눈앞에 올린다. 사람이 "체크하는 것"을 기억해야
@@ -7,6 +7,10 @@
 
 **보고만 한다.** 실행은 사람이 승인한 뒤 대화형으로(wiki-ingest·wiki-lint).
 무인이 기존 페이지를 고치지 않는다는 규약 §6.2·§8.1 을 우회하지 않기 위해서다.
+
+⚠️ **전에는 「오늘 일지의 「볼트」 섹션」을 읽었다.** 그 구조에 구멍이 있었다 —
+오늘 일지만 보므로 **어제 이후에 쌓인 항목은 영영 안 올라왔다**. 목록을 날짜에서 떼어
+파일 하나로 옮기면서 같이 해소됐다. 형식·경로·중복 판정은 `vault_backlog.py` 가 갖는다.
 
 조용함 규칙:
 - 미처리 줄이 없으면 아무것도 출력하지 않는다 (무관한 프로젝트 세션에서의 소음 방지)
@@ -25,7 +29,6 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-import re
 import sys
 from datetime import date
 from pathlib import Path
@@ -33,24 +36,10 @@ from pathlib import Path
 # 이 스크립트는 볼트 안(scripts/)에 살므로 자기 위치로 볼트를 찾는다 —
 # 훅은 임의의 디렉토리에서 불리기 때문에 cwd 에 기댈 수 없다.
 # 심볼릭 링크 등으로 밖에 두고 쓸 때만 VAULT_PATH 로 덮어쓴다.
-VAULT = Path(
-    os.environ.get("VAULT_PATH") or Path(__file__).resolve().parent.parent
-).expanduser()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import vault_backlog as backlog  # noqa: E402  (경로 주입 후에만 import 가능)
+
 STATE = Path.home() / ".claude" / ".vault-backlog-state.json"
-
-SECTION = re.compile(r"^## 볼트\s*$(.*?)(?=^## |\Z)", re.M | re.DOTALL)
-UNCHECKED = re.compile(r"^- \[ \] (.+)$", re.M)
-
-
-def backlog_lines(today: str) -> list[str]:
-    """오늘 일지 「볼트」 섹션의 미완료 항목. 일지가 없으면 빈 목록."""
-    daily = VAULT / "wiki" / "daily" / f"{today}.md"
-    if not daily.is_file():
-        return []
-    section = SECTION.search(daily.read_text(encoding="utf-8"))
-    if not section:
-        return []
-    return [m.strip() for m in UNCHECKED.findall(section.group(1))]
 
 
 def is_hook_run() -> bool:
@@ -69,7 +58,8 @@ def is_hook_run() -> bool:
 
 
 def already_shown(today: str, digest: str) -> bool:
-    """같은 잔량을 오늘 이미 알렸는지. 상태 파일이 깨져 있으면 알린 적 없는 것으로 본다."""
+    """같은 잔량을 오늘 이미 알렸는지. 상태 파일이 깨져 있으면 알린 적 없는 것으로
+    본다."""
     try:
         state = json.loads(STATE.read_text(encoding="utf-8"))
     except (OSError, ValueError):
@@ -88,8 +78,9 @@ def mark_shown(today: str, digest: str) -> None:
 
 
 def skill_for(line: str) -> str:
-    """줄머리 접두사로 담당 스킬을 가른다 (ingest_morning.sh · lint_morning.py 가 박는다)."""
-    # 날짜 괄호가 붙기 전 형식(`ingest:`)도 받는다 — 옛 줄이 일지에 남아 있다
+    """줄머리 접두사로 담당 스킬을 가른다 (ingest_morning.sh · lint_morning.py 가
+    박는다)."""
+    # 날짜 괄호가 붙기 전 형식(`ingest:`)도 받는다 — 옛 줄이 백로그에 남아 있다
     if line.startswith("lint"):
         return "wiki-lint"
     return "wiki-ingest"
@@ -98,8 +89,10 @@ def skill_for(line: str) -> str:
 def is_headless() -> bool:
     """사람이 보고 있지 않은 세션인가 — 그러면 알릴 상대가 없다.
 
-    - `VAULT_HOOK_SILENT`: 볼트 자동화가 `claude -p` 를 띄울 때 직접 박는다 (확실한 신호)
-    - `CLAUDE_CODE_ENTRYPOINT == sdk-cli`: `claude -p`(print 모드)의 값. 대화형은 `cli` 다.
+    - `VAULT_HOOK_SILENT`: 볼트 자동화가 `claude -p` 를 띄울 때 직접 박는다 (확실한
+    신호)
+    - `CLAUDE_CODE_ENTRYPOINT == sdk-cli`: `claude -p`(print 모드)의 값. 대화형은 `cli`
+    다.
       **모르는 값은 사람으로 취급한다** — 침묵이 기본값이 되면 알림이 조용히 죽는다
     """
     if os.environ.get("VAULT_HOOK_SILENT"):
@@ -111,7 +104,7 @@ def main() -> int:
     if is_headless():
         return 0
     today = f"{date.today():%Y-%m-%d}"
-    lines = backlog_lines(today)
+    lines = backlog.open_items()
     if not lines:
         return 0
 
@@ -122,13 +115,13 @@ def main() -> int:
 
     skills = sorted({skill_for(line) for line in lines})
     body = "\n".join(
-        [f"[볼트] 오늘 일지({today}) 「볼트」에 미처리 {len(lines)}건:"]
+        [f"[볼트] `볼트-백로그.md` 에 미처리 {len(lines)}건:"]
         + [f"  - {line}   → {skill_for(line)}" for line in lines]
         + [
             "무인 실행이 자기 권한 밖이라 남긴 잔여 작업이다. "
             f"세션의 첫 응답에서 사용자에게 지금 처리할지 한 줄로 묻고, 승인하면 "
-            f"{' · '.join(skills)} 로 처리한 뒤 해당 체크박스를 닫아라. "
-            "승인 전에는 손대지 마라."
+            f"{' · '.join(skills)} 로 처리한 뒤 그 줄을 `볼트-백로그.md` 에서 "
+            "**지워라**(체크가 아니라 삭제 — 이력은 log.md). 승인 전에는 손대지 마라."
         ]
     )
 

@@ -128,7 +128,7 @@ cat /tmp/wiki-daily-gen.log                                   # 마지막 실행
 ## 5.1 위키 lint 자동 점검 launchd (매일 08:30)
 
 스크립트는 볼트에 있고(`scripts/lint_morning.py`) **스케줄 등록만 기기별**이다.
-정답이 하나뿐인 것만 고치고 나머지는 그날 일지 「볼트」로 넘긴다 (규약 §8.1):
+정답이 하나뿐인 것만 고치고 나머지는 `볼트-백로그.md` 로 넘긴다 (규약 §8.1):
 
 ```bash
 cat > ~/Library/LaunchAgents/com.user.wiki-lint.plist <<EOF
@@ -203,7 +203,7 @@ launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.user.wiki-ingest.pli
 
 ## 6.1 볼트 잔량 훅 (SessionStart → 미처리 알림)
 
-무인 ingest·무인 점검이 자기 권한 밖이라 일지 「볼트」에 남긴 잔여 작업을, 세션이
+무인 ingest·무인 점검이 자기 권한 밖이라 `볼트-백로그.md` 에 남긴 잔여 작업을, 세션이
 열릴 때 컨텍스트로 올린다. `~/.claude/settings.json` 의 `hooks.SessionStart` 에
 **두 군데** — `matcher: "startup"` 과 `matcher: "resume|clear"` — 로 등록한다
 (`startup` 만 걸면 `--resume` 이나 `/clear` 로 이어간 세션에서 안 뜬다):
